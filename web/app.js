@@ -75,6 +75,7 @@ function render() {
   if (!state) return;
   const occupied = seats.filter(s => s.occupied || checkins.some(c => c.seat === s.seat)).length;
   text('occupied-count',occupied);
+  text('reset-text',state.round.id === 1 ? '尚未重置' : `重置於 ${time(state.round.started_at)}`);
   if (adminMode) {
     $('records-body').replaceChildren();
     for (const c of checkins) {

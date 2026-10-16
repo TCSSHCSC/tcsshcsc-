@@ -21,3 +21,5 @@ html{-webkit-text-size-adjust:100%}button,a,input,select{touch-action:manipulati
 .aisle{grid-row:1 / 9;min-width:0;display:flex;align-items:center;justify-content:center;writing-mode:vertical-rl;color:#666;font-size:13px;letter-spacing:4px;background:#fafafa}
 @media(max-width:700px){.seat-grid,.column-labels{--row-offset:0;grid-template-columns:repeat(2,minmax(0,1fr)) 18px repeat(2,minmax(0,1fr)) 18px repeat(2,minmax(0,1fr))}.aisle{font-size:12px;letter-spacing:3px}}
 @media(max-width:350px){.seat-grid,.column-labels{grid-template-columns:repeat(2,minmax(0,1fr)) 16px repeat(2,minmax(0,1fr)) 16px repeat(2,minmax(0,1fr))}}
+
+.sync{flex-wrap:wrap;max-width:100%}#sync-text,#reset-text{white-space:nowrap}@media(max-width:700px){.sync{width:100%;justify-content:flex-end;row-gap:6px}}
