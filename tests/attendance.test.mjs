@@ -73,15 +73,22 @@ test('admin can disable/enable seats; occupied seats cannot be disabled',async()
   assert.equal((await call('/api/checkin',checkin,student)).status,200);
   assert.equal((await call('/api/admin/seat',{room:'B',seat:8,blocked:true},admin)).status,409);
 });
-test('new round preserves history and blocked seats; stale requests cannot modify new round',async()=>{
-  const {call,auth}=await setup();const admin=await auth('admin'),student=await auth('student');
+test('reset deletes attendance and retains only current state and blocked seats',async()=>{
+  const {call,auth,DB}=await setup();const admin=await auth('admin'),student=await auth('student');
   await call('/api/checkin',{roundId:1,room:'A',seat:1,className:'103',studentNumber:1},student);
   await call('/api/admin/seat',{room:'B',seat:48,blocked:true},admin);
   assert.equal((await call('/api/admin/round',{roundId:1},admin)).status,200);
   assert.equal((await call('/api/admin/round',{roundId:1},admin)).status,409);
   assert.equal((await call('/api/checkin',{roundId:1,room:'A',seat:2,className:'103',studentNumber:1},student)).status,409);
   const state=await (await call('/api/state')).json();assert.equal(state.round.id,2);assert.ok(state.seats.every(s=>!s.occupied));assert.equal(state.seats.at(-1).blocked,true);
-  const csv=await (await call('/api/admin/export?round=1',undefined,admin)).text();assert.match(csv,/test@stu.tcssh.tc.edu.tw/);
+  assert.equal(DB.sqlite.prepare('SELECT count(*) AS n FROM checkins').get().n,0);
+  assert.equal(DB.sqlite.prepare('SELECT count(*) AS n FROM rounds').get().n,1);
+  assert.equal((await call('/api/admin/history',undefined,admin)).status,404);
+  assert.equal((await call('/api/admin/export?round=1',undefined,admin)).status,404);
+  assert.equal((await call('/api/checkin',{roundId:2,room:'B',seat:1,className:'103',studentNumber:1},student)).status,200);
+  assert.equal((await call('/api/admin/round',{roundId:2},admin)).status,200);
+  assert.equal(DB.sqlite.prepare('SELECT count(*) AS n FROM checkins').get().n,0);
+  assert.equal(DB.sqlite.prepare('SELECT count(*) AS n FROM rounds').get().n,1);
 });
 test('admin login sets HttpOnly session; logout revokes it',async()=>{
   const {call}=await setup();const response=await call('/api/admin/login',{username:'tcsshcsc',password:'test-password-only'});

@@ -15,7 +15,7 @@ Cloudflare Workers + D1 的社團座位點名系統。學員必須以 `@stu.tcss
 - 紅燈未報到、綠燈已報到、灰燈停用。登入 Google 後點選座位，填寫班級與班級座號。
 - 每場每個 Google 帳號只能占一席，A/B 兩間共用限制；同班級座號不能重複。班級名稱須由學員一致填寫，尚未串接學籍名冊。
 - 管理員帳號 `tcsshcsc`；密碼僅以加鹽 PBKDF2 雜湊存在 Cloudflare secret，公開倉庫不含真實密碼或雜湊。
-- 管理員可停用/恢復空位，查看報到名單、匯出 CSV、同時為兩班開始新場次。歷史紀錄與停用座位保留。
+- 管理員可停用/恢復空位，查看報到名單、同時清空兩班點名。不保留場次歷史或提供歷史匯出，停用座位保留。資料庫僅保留一筆目前版本狀態，以阻擋重設前的舊請求。
 - 無自動更新或倒數。只有管理員有「更新資料」及「重設點名」按鈕；瀏覽器重新整理不會清除點名。公開 API 不傳回學員姓名、帳號或班級座號。
 - GitHub Pages 使用 sessionStorage 中的 Bearer session（關閉分頁清除），不依賴第三方 Cookie，8 小時到期。API 僅允許指定 GitHub Pages 來源。每 IP 每 15 分鐘最多 20 次登入嘗試。
 - SQLite constraints 與 triggers 原子檢查座位、帳號及班級座號衝突，並拒絕舊場次報到。
@@ -48,7 +48,7 @@ npm run deploy
 
 既有正式資料庫不需重建。`wrangler.jsonc` 內的 D1 ID 為本專案已建立的資料庫。若複製到其他帳號，請替換 ID，Google OAuth 也需加入新的網站來源。前端透過 npm run build 產生根目錄的 index.html、app.js、style.css 與說明頁，請一併提交到 main；GitHub Pages 來源使用 main 的根目錄。後端與 D1 binding 在 Workers 執行，舊網站網址轉向 GitHub Pages。
 
-每天 UTC 19:00（台灣 03:00）清除過期 session 與登入限制計數。此排程不刪除點名歷史。可由管理員使用 Cloudflare D1 控制台處理學員的更正或刪除請求。
+每天 UTC 19:00（台灣 03:00）清除過期 session 與登入限制計數。點名資料由管理員重設時直接清空。可由管理員使用 Cloudflare D1 控制台處理學員的更正或刪除請求。
 
 ## Google OAuth
 
@@ -67,7 +67,7 @@ npx wrangler deploy --dry-run
 npx wrangler types
 ```
 
-測試覆蓋：96 席/公開資料最小化、未登入與偽造 token 拒絕、跨來源請求拒絕、雙人搶位、跨教室重複報到、停用座位、歷史保留、舊場次防護、session 登入登出與到期、登入速率限制。測試在獨立記憶體 SQLite 執行，不修改正式 D1。Google 真實登入與 Workers 執行環境另需瀏覽器驗證。
+測試覆蓋：96 席/公開資料最小化、未登入與偽造 token 拒絕、跨來源請求拒絕、雙人搶位、跨教室重複報到、停用座位、重設刪除與固定儲存量、舊場次防護、session 登入登出與到期、登入速率限制。測試在獨立記憶體 SQLite 執行，不修改正式 D1。Google 真實登入與 Workers 執行環境另需瀏覽器驗證。
 
 ## 結構
 

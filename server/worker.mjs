@@ -149,21 +149,14 @@ export async function route(request, env, ctx) {
       if (!Number.isSafeInteger(roundId) || roundId < 1) throw fail('場次不正確。');
       const result = await env.DB.batch([
         env.DB.prepare('INSERT INTO rounds(id) SELECT ? WHERE (SELECT current_round FROM settings WHERE id=1)=?').bind(roundId+1,roundId),
-        env.DB.prepare("UPDATE rounds SET ended_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=? AND (SELECT current_round FROM settings WHERE id=1)=?").bind(roundId,roundId),
+        env.DB.prepare('DELETE FROM checkins WHERE (SELECT current_round FROM settings WHERE id=1)=?').bind(roundId),
         env.DB.prepare('UPDATE settings SET current_round=? WHERE id=1 AND current_round=?').bind(roundId+1,roundId),
+        env.DB.prepare('DELETE FROM rounds WHERE id<>(SELECT current_round FROM settings WHERE id=1)'),
       ]);
       if (!result[0].meta.changes) throw fail(messages.ROUND_CHANGED, 409);
       return json({ roundId: roundId+1 });
     }
-    if (path === '/api/admin/history' && method === 'GET') return json((await env.DB.prepare('SELECT * FROM rounds ORDER BY id DESC LIMIT 100').all()).results);
-    if (path === '/api/admin/export' && method === 'GET') {
-      const round = Number(url.searchParams.get('round'));
-      if (!Number.isSafeInteger(round) || round < 1) throw fail('場次不正確。');
-      const rows = (await env.DB.prepare('SELECT room,seat,class_name,student_number,email,checked_in_at FROM checkins WHERE round_id=? ORDER BY room,seat').bind(round).all()).results;
-      const csv = value => '"' + String(value ?? '').replace(/^[=+@\-\t\r]/, "'$&").replaceAll('"', '""') + '"';
-      const data = [['教室','座位','班級','座號','Google 帳號','點名時間'], ...rows.map(r => [r.room,r.seat,r.class_name,r.student_number,r.email,new Date(r.checked_in_at).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',hour12:false})])];
-      return new Response('\uFEFF'+data.map(row => row.map(csv).join(',')).join('\r\n'), { headers: { 'Content-Type':'text/csv; charset=utf-8', 'Content-Disposition':`attachment; filename="attendance-round-${round}.csv"` } });
-    }
+
   }
   throw fail('找不到此功能。', 404);
 }

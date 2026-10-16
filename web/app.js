@@ -98,7 +98,7 @@ async function refresh(silent = false) {
     }
     const changedRound = state && state.round.id !== newState.round.id;
     state = newState; render();
-    if (changedRound) { notice('新的點名場次已開始，請確認本次座位。'); if (adminMode) await loadHistory(); }
+    if (changedRound) { notice('點名已重設，請重新選位。'); }
     text('sync-text',`更新於 ${new Date().toLocaleTimeString('zh-TW',{hour12:false})}`); $('sync-dot').classList.add('live');
   } catch (error) {
     text('sync-text','連線中斷 · 請重新整理'); $('sync-dot').classList.remove('live');
@@ -110,10 +110,6 @@ function adminUI(loggedIn) {
   adminLoggedIn = loggedIn; $('admin-login-panel').hidden = loggedIn; $('workspace').hidden = !loggedIn;
   $('admin-actions').hidden = !loggedIn; $('records').hidden = !loggedIn;
   if (!loggedIn) { state = null; $('records-body').replaceChildren(); }
-}
-async function loadHistory() {
-  const rows = await api('/api/admin/history'); $('history').replaceChildren();
-  for (const r of rows) { const option = document.createElement('option'); option.value = r.id; option.textContent = `第 ${r.id} 場 · ${time(r.started_at)}`; $('history').append(option); }
 }
 async function initGoogle(clientId) {
   if (!clientId) { $('google-login').disabled = true; text('google-login','Google 登入設定中'); notice('Google 登入尚未設定完成，暫時無法報到。'); return; }
@@ -138,18 +134,13 @@ $('seat-form').onsubmit = event => { event.preventDefault(); task($('confirm-sea
 $('admin-form').onsubmit = event => { event.preventDefault(); task(event.submitter, async () => {
   text('admin-error',''); const form = new FormData(event.currentTarget);
   await api('/api/admin/login',{username:form.get('username'),password:form.get('password')}); $('admin-form').elements.password.value='';
-  adminUI(true); notice(''); await refresh(); await loadHistory();
+  adminUI(true); notice(''); await refresh();
 }, 'admin-error'); };
 $('student-logout').onclick = event => task(event.currentTarget,async () => { await api('/api/auth/logout',{}); sessionStorage.removeItem(tokenKey); window.google?.accounts.id.disableAutoSelect(); location.reload(); });
 $('admin-logout').onclick = event => task(event.currentTarget,async () => { await api('/api/admin/logout',{}); sessionStorage.removeItem(tokenKey); adminUI(false); notice('已登出管理員。'); });
 $('refresh').onclick = () => refresh();
 $('new-round').onclick = () => { text('round-error',''); $('round-dialog').dataset.roundId = state.round.id; $('round-dialog').showModal(); };
-$('round-form').onsubmit = event => { event.preventDefault(); task(event.submitter, async () => { await api('/api/admin/round',{roundId:Number($('round-dialog').dataset.roundId)}); $('round-dialog').close(); await refresh(); await loadHistory(); notice('兩班已重設，可以開始本次點名。歷史紀錄與停用座位已保留。',true); }, 'round-error'); };
-$('export').onclick = event => task(event.currentTarget, async () => {
-  const response = await fetch(API+`/api/admin/export?round=${encodeURIComponent($('history').value)}`,{headers:authHeaders()});
-  if (!response.ok) throw new Error((await response.json()).error || '匯出失敗。');
-  const blob = URL.createObjectURL(await response.blob()); const a = document.createElement('a'); a.href=blob; a.download=`attendance-${$('history').value}.csv`; a.click(); setTimeout(()=>URL.revokeObjectURL(blob),1000);
-});
+$('round-form').onsubmit = event => { event.preventDefault(); task(event.submitter, async () => { await api('/api/admin/round',{roundId:Number($('round-dialog').dataset.roundId)}); $('round-dialog').close(); await refresh(); notice('兩班點名資料已清空。停用座位已保留。',true); }, 'round-error'); };
 for (const button of document.querySelectorAll('.close')) button.onclick = () => button.closest('dialog').close();
 text('today',new Date().toLocaleDateString('zh-TW',{timeZone:'Asia/Taipei',year:'numeric',month:'long',day:'numeric',weekday:'long'}));
 text('count-room',room); text('room-letter',room); text('room-title',`${room} 班座位圖`);
@@ -161,7 +152,7 @@ if (adminMode) {
   text('seat-help','點選紅燈座位可停用，灰燈可恢復使用；綠燈可查看學員資料。');
   adminUI(false);
   if (sessionStorage.getItem(tokenKey)) $('admin-login-panel').hidden=true;
-  try { state=await api('/api/admin/state'); adminUI(true); render(); await loadHistory(); await refresh(); } catch(error) { adminUI(false); if(error.status===401) sessionStorage.removeItem(tokenKey); else notice(error.message); }
+  try { state=await api('/api/admin/state'); adminUI(true); render(); await refresh(); } catch(error) { adminUI(false); if(error.status===401) sessionStorage.removeItem(tokenKey); else notice(error.message); }
 } else {
   render();
   try { const config=await api('/api/config'); await refresh(); if (!me) await initGoogle(config.googleClientId); } catch(error) { notice(error.message); }
