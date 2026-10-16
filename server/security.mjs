@@ -29,7 +29,7 @@ export function seatInput(body) {
 export function studentInput(body) {
   seatInput(body);
   const className = typeof body.className === 'string' ? body.className.trim() : '';
-  if (!/^[\p{L}\p{N} -]{1,20}$/u.test(className) || !Number.isInteger(body.studentNumber) || body.studentNumber < 1 || body.studentNumber > 99) throw Object.assign(new Error('請輸入班級（最多 20 字）及座號（1–99）。'), { status: 400 });
+  if (!/^[0-9]{3}$/.test(className) || !Number.isInteger(body.studentNumber) || body.studentNumber < 1 || body.studentNumber > 99) throw Object.assign(new Error('班級請輸入 3 位數字（例如 212），座號請輸入 01–99。'), { status: 400 });
   if (!Number.isInteger(body.roundId) || body.roundId < 1) throw Object.assign(new Error('請重新整理點名場次。'), { status: 400 });
   return { ...body, className };
 }

@@ -40,7 +40,7 @@ async function setup() {
 }
 test('public state has exactly two 6×8 rooms and never exposes student information',async()=>{
   const {call,auth}=await setup();const student=await auth('student');
-  assert.equal((await call('/api/checkin',{roundId:1,room:'A',seat:1,className:'一年三班',studentNumber:1},student)).status,200);
+  assert.equal((await call('/api/checkin',{roundId:1,room:'A',seat:1,className:'103',studentNumber:1},student)).status,200);
   const response=await call('/api/state');const body=await response.json();
   assert.equal(body.seats.length,96);assert.equal(body.seats.filter(s=>s.room==='A').length,48);assert.equal(body.seats[0].occupied,true);
   assert.ok(!JSON.stringify(body).includes('test@stu.tcssh.tc.edu.tw'));assert.ok(!('checkins' in body));
@@ -124,4 +124,14 @@ test('GitHub Pages CORS and bearer sessions enforce admin-only reset',async()=>{
   assert.equal((await request('/api/admin/state',undefined,token)).status,401);
   const nonce=await request('/api/auth/nonce');assert.match((await nonce.json()).nonce,/^[a-f0-9]{64}$/);
   assert.equal(DB.sqlite.prepare('SELECT count(*) AS n FROM login_nonces').get().n,1);
+});
+
+
+test('class must be three digits and school seat number must be 1 to 99',async()=>{
+ const {call,auth}=await setup();const student=await auth('student');
+ const body={roundId:1,room:'A',seat:1,className:'212',studentNumber:2};
+ for(const className of ['二年十二班','21','2121','2A2']) assert.equal((await call('/api/checkin',{...body,className},student)).status,400);
+ for(const studentNumber of [0,100,1.5,'02']) assert.equal((await call('/api/checkin',{...body,studentNumber},student)).status,400);
+ assert.equal((await call('/api/checkin',body,student)).status,200);
+ const me=await (await call('/api/me',undefined,student)).json();assert.equal(me.checkin.class_name,'212');assert.equal(me.checkin.student_number,2);
 });

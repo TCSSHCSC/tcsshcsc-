@@ -30,7 +30,7 @@ function signedInUI() {
   if (me?.checkin) {
     const c = me.checkin;
     text('login-title', '已完成點名');
-    text('login-description', `${me.email} · ${c.room} 班 ${String(c.seat).padStart(2,'0')} 號座位 · ${c.class_name} ${c.student_number} 號`);
+    text('login-description', `${me.email} · ${c.room} 班 ${String(c.seat).padStart(2,'0')} 號座位 · ${c.class_name} ${String(c.student_number).padStart(2,'0')} 號`);
   }
 }
 function render() {
@@ -47,10 +47,10 @@ function render() {
       if (me?.checkin?.room === room && me.checkin.seat === seat.seat) button.classList.add('mine');
       button.textContent = String(seat.seat).padStart(2,'0');
       button.setAttribute('aria-label', `${room} 班 ${seat.seat} 號，${status}`);
-      button.title = adminMode && checkin ? `${checkin.class_name} ${checkin.student_number} 號` : status;
+      button.title = adminMode && checkin ? `${checkin.class_name} ${String(checkin.student_number).padStart(2,'0')} 號` : status;
       button.disabled = !!seat.unknown || (adminMode ? !adminLoggedIn : !me || seat.blocked || occupied || !!me?.checkin);
       button.onclick = () => {
-        if (adminMode && occupied) { notice(`${room} 班 ${seat.seat} 號：${checkin.class_name} ${checkin.student_number} 號，${checkin.email}`); return; }
+        if (adminMode && occupied) { notice(`${room} 班 ${seat.seat} 號：${checkin.class_name} ${String(checkin.student_number).padStart(2,'0')} 號，${checkin.email}`); return; }
         if (!adminMode && !me) { notice('請先登入 Google 帳號，再選擇座位。'); $('google-login').focus(); return; }
         selected = {...seat,roundId:state.round.id};
         text('dialog-title', `${room} 班 · ${String(seat.seat).padStart(2,'0')} 號座位`);
@@ -70,7 +70,7 @@ function render() {
     $('records-body').replaceChildren();
     for (const c of checkins) {
       const tr = document.createElement('tr');
-      for (const value of [`${room}-${String(c.seat).padStart(2,'0')}`,c.class_name,c.student_number,c.email,time(c.checked_in_at)]) {
+      for (const value of [`${room}-${String(c.seat).padStart(2,'0')}`,c.class_name,String(c.student_number).padStart(2,'0'),c.email,time(c.checked_in_at)]) {
         const td = document.createElement('td'); td.dataset.label = ['座位','班級','座號','Google 帳號','報到時間'][tr.children.length]; td.textContent = value; tr.append(td);
       }
       $('records-body').append(tr);
