@@ -46,7 +46,7 @@ npx wrangler secret put ADMIN_PASSWORD_HASH
 npm run deploy
 ```
 
-既有正式資料庫不需重建。`wrangler.jsonc` 內的 D1 ID 為本專案已建立的資料庫。若複製到其他帳號，請替換 ID，Google OAuth 也需加入新的網站來源。前端透過 npm run build 產生 docs/，將 docs/ 一併提交到 main；GitHub Pages 來源設為 main 的 /docs。後端與 D1 binding 在 Workers 執行，舊網站網址轉向 GitHub Pages。
+既有正式資料庫不需重建。`wrangler.jsonc` 內的 D1 ID 為本專案已建立的資料庫。若複製到其他帳號，請替換 ID，Google OAuth 也需加入新的網站來源。前端透過 npm run build 產生根目錄的 index.html、app.js、style.css 與說明頁，請一併提交到 main；GitHub Pages 來源使用 main 的根目錄。後端與 D1 binding 在 Workers 執行，舊網站網址轉向 GitHub Pages。
 
 每天 UTC 19:00（台灣 03:00）清除過期 session 與登入限制計數。此排程不刪除點名歷史。可由管理員使用 Cloudflare D1 控制台處理學員的更正或刪除請求。
 

@@ -5,6 +5,5 @@ await build({ entryPoints: ['web/app.js'], bundle: true, minify: true, format: '
 for (const name of ['index.html', 'style.css', 'privacy.html', 'terms.html']) await copyFile(`web/${name}`, `dist/${name}`);
 console.log('Built dist/');
 
-await mkdir('docs', {recursive:true});
-for (const name of ['index.html','app.js','style.css','privacy.html','terms.html']) await copyFile('dist/'+name,'docs/'+name);
-await writeFile('docs/.nojekyll','');
+for (const name of ['index.html','app.js','style.css','privacy.html','terms.html']) await copyFile('dist/'+name,name);
+await writeFile('.nojekyll','');
