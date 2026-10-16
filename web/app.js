@@ -38,6 +38,11 @@ function render() {
   const checkins = state?.checkins?.filter(c => c.room === room) || [];
   const grid = $('seat-grid'); grid.replaceChildren();
   for (let row = 0; row < 8; row++) {
+    if (row === 2 || row === 4) {
+      const aisle = document.createElement('div');
+      aisle.className = 'aisle'; aisle.textContent = '走道';
+      grid.append(aisle);
+    }
     const label = document.createElement('span'); label.className = 'row-label'; label.textContent = String(row+1).padStart(2,'0'); grid.append(label);
     for (const seat of seats.slice(row*6,row*6+6)) {
       const checkin = checkins.find(c => c.seat === seat.seat);
