@@ -133,7 +133,7 @@ $('student-logout').onclick = event => task(event.currentTarget,async () => { aw
 $('admin-logout').onclick = event => task(event.currentTarget,async () => { await api('/api/admin/logout',{}); adminUI(false); notice('已登出管理員。'); });
 $('refresh').onclick = () => refresh();
 $('new-round').onclick = () => { text('round-error',''); $('round-dialog').dataset.roundId = state.round.id; $('round-dialog').showModal(); };
-$('round-form').onsubmit = event => { event.preventDefault(); task(event.submitter, async () => { await api('/api/admin/round',{roundId:Number($('round-dialog').dataset.roundId)}); $('round-dialog').close(); await refresh(); await loadHistory(); notice('新場次已開始，舊紀錄已保留。',true); }, 'round-error'); };
+$('round-form').onsubmit = event => { event.preventDefault(); task(event.submitter, async () => { await api('/api/admin/round',{roundId:Number($('round-dialog').dataset.roundId)}); $('round-dialog').close(); await refresh(); await loadHistory(); notice('兩班已重設，可以開始本次點名。歷史紀錄與停用座位已保留。',true); }, 'round-error'); };
 $('export').onclick = event => task(event.currentTarget, async () => {
   const response = await fetch(`/api/admin/export?round=${encodeURIComponent($('history').value)}`);
   if (!response.ok) throw new Error((await response.json()).error || '匯出失敗。');
