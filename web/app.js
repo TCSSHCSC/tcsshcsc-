@@ -71,7 +71,7 @@ function render() {
     for (const c of checkins) {
       const tr = document.createElement('tr');
       for (const value of [`${room}-${String(c.seat).padStart(2,'0')}`,c.class_name,c.student_number,c.email,time(c.checked_in_at)]) {
-        const td = document.createElement('td'); td.textContent = value; tr.append(td);
+        const td = document.createElement('td'); td.dataset.label = ['座位','班級','座號','Google 帳號','報到時間'][tr.children.length]; td.textContent = value; tr.append(td);
       }
       $('records-body').append(tr);
     }
