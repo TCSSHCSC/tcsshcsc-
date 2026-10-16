@@ -151,7 +151,8 @@ if (adminMode) {
   $('login-card').hidden=true; $('guide').hidden=true; $('room-a').href='?admin=1&room=A'; $('room-b').href='?admin=1&room=B';
   text('seat-help','點選紅燈座位可停用，灰燈可恢復使用；綠燈可查看學員資料。');
   adminUI(false);
-  try { state=await api('/api/admin/state'); adminUI(true); render(); await loadHistory(); await refresh(); } catch(error) { if(error.status!==401) notice(error.message); }
+  if (sessionStorage.getItem(tokenKey)) $('admin-login-panel').hidden=true;
+  try { state=await api('/api/admin/state'); adminUI(true); render(); await loadHistory(); await refresh(); } catch(error) { adminUI(false); if(error.status===401) sessionStorage.removeItem(tokenKey); else notice(error.message); }
 } else {
   render();
   try { const config=await api('/api/config'); await refresh(); if (!me) await initGoogle(config.googleClientId); } catch(error) { notice(error.message); }
