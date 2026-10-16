@@ -39,13 +39,13 @@ function render() {
   const grid = $('seat-grid'); grid.replaceChildren();
   for (let row = 0; row < 8; row++) {
     const label = document.createElement('span'); label.className = 'row-label'; label.textContent = String(row+1).padStart(2,'0'); label.style.gridRow = row+1; grid.append(label);
-    for (const seat of seats.slice(row*6,row*6+6)) {
+    for (const seat of Array.from({length:6}, (_, column) => seats.find(seat => seat.seat === column*8+row+1))) {
       const checkin = checkins.find(c => c.seat === seat.seat);
       const occupied = !!(seat.occupied || checkin);
       const status = seat.unknown ? '連線中' : seat.blocked ? '停用座位' : occupied ? '已報到' : '未報到';
       const button = document.createElement('button'); button.className = `seat ${seat.blocked?'blocked':occupied?'occupied':''}`;
       if (me?.checkin?.room === room && me.checkin.seat === seat.seat) button.classList.add('mine');
-      const column = (seat.seat - 1) % 6;
+      const column = Math.floor((seat.seat - 1) / 8);
       button.style.setProperty('--seat-column', column + Math.floor(column / 2) + 1);
       button.style.gridRow = row + 1;
       button.textContent = String(seat.seat).padStart(2,'0');
