@@ -9,6 +9,7 @@ function database() {
   const sqlite = new DatabaseSync(':memory:');
   sqlite.exec('PRAGMA foreign_keys=ON;');
   sqlite.exec(readFileSync(new URL('../migrations/0001_attendance.sql',import.meta.url),'utf8'));
+  sqlite.exec(readFileSync(new URL('../migrations/0002_login_nonces.sql',import.meta.url),'utf8'));
   const wrap = (sql, args=[]) => ({
     bind: (...values) => wrap(sql,values),
     first: async () => sqlite.prepare(sql).get(...args) || null,
@@ -37,7 +38,7 @@ async function setup() {
   }
   return {DB,env,call,auth};
 }
-test('public state has exactly two 8×6 rooms and never exposes student information',async()=>{
+test('public state has exactly two 6×8 rooms and never exposes student information',async()=>{
   const {call,auth}=await setup();const student=await auth('student');
   assert.equal((await call('/api/checkin',{roundId:1,room:'A',seat:1,className:'一年三班',studentNumber:1},student)).status,200);
   const response=await call('/api/state');const body=await response.json();
@@ -103,4 +104,24 @@ test('only verified Google Workspace student identities are accepted',async()=>{
   const {call,auth}=await setup();const oldPersonalSession=await auth('student','personal','personal@gmail.com');
   assert.equal((await call('/api/me',undefined,oldPersonalSession)).status,403);
   assert.equal((await call('/api/checkin',{roundId:1,room:'A',seat:1,className:'103',studentNumber:1},oldPersonalSession)).status,403);
+});
+
+
+test('GitHub Pages CORS and bearer sessions enforce admin-only reset',async()=>{
+  const {env,auth,DB}=await setup();
+  const origin='https://tcsshcsc.github.io';
+  const request=(path,body,token,source=origin)=>worker.fetch(new Request('https://attendance.test'+path,{method:body===undefined?'GET':'POST',headers:{origin:source,'Content-Type':'application/json','X-Requested-With':'attendance',...(token?{Authorization:'Bearer '+token}:{})},body:body===undefined?undefined:JSON.stringify(body)}),env,{});
+  const preflight=await worker.fetch(new Request('https://attendance.test/api/admin/state',{method:'OPTIONS',headers:{origin}}),env,{});
+  assert.equal(preflight.status,204);assert.equal(preflight.headers.get('Access-Control-Allow-Origin'),origin);
+  const login=await request('/api/admin/login',{username:'tcsshcsc',password:'test-password-only'});const {token}=await login.json();assert.ok(token);
+  assert.equal((await request('/api/admin/state',undefined,token)).status,200);
+  const student=(await auth('student')).split('=')[1];
+  assert.equal((await request('/api/admin/round',{roundId:1},student)).status,401);
+  assert.equal((await request('/api/admin/round',{roundId:1})).status,401);
+  assert.equal((await request('/api/admin/round',{roundId:1},token,'https://evil.test')).status,403);
+  assert.equal((await request('/api/admin/round',{roundId:1},token)).status,200);
+  assert.equal((await request('/api/admin/logout',{},token)).status,200);
+  assert.equal((await request('/api/admin/state',undefined,token)).status,401);
+  const nonce=await request('/api/auth/nonce');assert.match((await nonce.json()).nonce,/^[a-f0-9]{64}$/);
+  assert.equal(DB.sqlite.prepare('SELECT count(*) AS n FROM login_nonces').get().n,1);
 });

@@ -2,6 +2,8 @@ import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { randomToken, tokenHash, verifyPassword, seatInput, studentInput, isSchoolEmail, verifySchoolIdentity } from './security.mjs';
 // Only public signing keys are cached; no request or user state is shared.
 const googleKeys = createRemoteJWKSet(new URL('https://www.googleapis.com/oauth2/v3/certs'));
+const FRONTEND = 'https://tcsshcsc.github.io';
+const allowedOrigin = request => [new URL(request.url).origin, FRONTEND].includes(request.headers.get('origin'));
 const fail = (message, status = 400) => Object.assign(new Error(message), { status });
 const json = (data, status = 200, headers = {}) => Response.json(data, { status, headers });
 const messages = {
@@ -33,7 +35,7 @@ async function bodyJson(request) {
   catch { throw fail('資料格式錯誤。'); }
 }
 async function session(request, env, role) {
-  const token = cookieValue(request, `attendance_${role}`);
+  const token = request.headers.get('authorization')?.replace(/^Bearer /,'') || cookieValue(request, `attendance_${role}`);
   if (!token || !/^[a-f0-9]{64}$/.test(token)) throw fail(role === 'admin' ? '請先登入管理員。' : '請先登入 Google 帳號。', 401);
   const row = await env.DB.prepare('SELECT * FROM sessions WHERE token_hash=? AND role=? AND expires_at>?').bind(await tokenHash(token), role, Date.now()).first();
   if (!row) throw fail('登入已過期，請重新登入。', 401);
@@ -43,7 +45,7 @@ async function session(request, env, role) {
 async function newSession(request, env, role, userId = null, email = null) {
   const token = randomToken();
   await env.DB.prepare('INSERT INTO sessions(token_hash,role,user_id,email,expires_at) VALUES(?,?,?,?,?)').bind(await tokenHash(token), role, userId, email, Date.now() + 8 * 3600000).run();
-  return cookie(request, `attendance_${role}`, token, 8 * 3600);
+  return {token, cookie:cookie(request, `attendance_${role}`, token, 8 * 3600)};
 }
 async function limitLogin(request, env) {
   const ip = request.headers.get('cf-connecting-ip') || 'local';
@@ -64,42 +66,50 @@ export async function route(request, env, ctx) {
   const url = new URL(request.url), path = url.pathname, method = request.method;
   if (!path.startsWith('/api/')) {
     if (!['GET','HEAD'].includes(method)) return new Response('Method not allowed', { status: 405 });
-    if (['/','/a','/b','/admin','/admin/a','/admin/b'].includes(path)) {
-      const assetUrl = new URL(request.url); assetUrl.pathname = '/index.html';
-      return env.ASSETS.fetch(new Request(assetUrl, request));
-    }
-    return env.ASSETS.fetch(request);
+    const query = new URLSearchParams();
+    if (path.startsWith('/admin')) query.set('admin','1');
+    if (path.endsWith('/b')) query.set('room','B');
+    return Response.redirect(FRONTEND+'/tcsshcsc-/'+(path.endsWith('.html') && path !== '/index.html' ? path.slice(1) : '?'+query),302);
+  }
+  if (method === 'OPTIONS') {
+    if (!allowedOrigin(request)) throw fail('不允許的來源。',403);
+    return new Response(null,{status:204});
   }
   if (!['GET', 'POST'].includes(method)) throw fail('不支援此操作。', 405);
-  if (method === 'POST' && (request.headers.get('origin') !== url.origin || request.headers.get('x-requested-with') !== 'attendance')) throw fail('請由本網站操作。', 403);
+  if (method === 'POST' && (!allowedOrigin(request) || request.headers.get('x-requested-with') !== 'attendance')) throw fail('請由本網站操作。', 403);
   if (path === '/api/config' && method === 'GET') return json({ googleClientId: env.GOOGLE_CLIENT_ID || '', configured: !!env.DB });
   if (!env.DB) throw fail('資料庫尚未設定完成，現在無法點名。', 503);
   if (path === '/api/auth/nonce' && method === 'GET') {
     const nonce = randomToken();
+    await env.DB.prepare('INSERT INTO login_nonces(nonce_hash,expires_at) VALUES(?,?)').bind(await tokenHash(nonce),Date.now()+600000).run();
     return json({ nonce }, 200, { 'Set-Cookie': cookie(request, 'attendance_nonce', nonce, 600) });
   }
   if (path === '/api/auth/google' && method === 'POST') {
     await limitLogin(request, env);
     if (!env.GOOGLE_CLIENT_ID) throw fail('Google 登入尚未完成設定。', 503);
     const body = await bodyJson(request);
-    const nonce = cookieValue(request, 'attendance_nonce');
+    const nonce = body.nonce || cookieValue(request, 'attendance_nonce');
     if (!nonce || !/^[a-f0-9]{64}$/.test(nonce)) throw fail('登入驗證已過期，請重新整理。', 401);
     let payload;
     try { ({ payload } = await jwtVerify(body.credential, googleKeys, { audience: env.GOOGLE_CLIENT_ID, issuer: ['https://accounts.google.com','accounts.google.com'], algorithms: ['RS256'], maxTokenAge: '10m' })); }
     catch { throw fail('Google 驗證失敗，請重新登入。', 401); }
     if (payload.nonce !== nonce || !payload.sub || !payload.email || payload.email_verified !== true) throw fail('Google 帳號驗證失敗。', 401);
     if (!verifySchoolIdentity(payload)) throw fail('此帳號不是中二中學生帳號，請改用 @stu.tcssh.tc.edu.tw 的 Google 帳號登入。', 403);
+    const consumed = await env.DB.prepare('DELETE FROM login_nonces WHERE nonce_hash=? AND expires_at>? RETURNING nonce_hash').bind(await tokenHash(nonce),Date.now()).first();
+    if (!consumed) throw fail('登入驗證已過期，請重新整理。',401);
+    const issued = await newSession(request, env, 'student', payload.sub, payload.email);
     const headers = new Headers();
-    headers.append('Set-Cookie', await newSession(request, env, 'student', payload.sub, payload.email));
+    headers.append('Set-Cookie', issued.cookie);
     headers.append('Set-Cookie', cookie(request, 'attendance_nonce', '', 0));
-    return json({ success: true, email: payload.email }, 200, headers);
+    return json({ success: true, email: payload.email, token:issued.token }, 200, headers);
   }
   if (path === '/api/admin/login' && method === 'POST') {
     await limitLogin(request, env);
     const body = await bodyJson(request);
     const valid = await verifyPassword(body.password, env.ADMIN_PASSWORD_HASH);
     if (body.username !== env.ADMIN_USERNAME || !valid) throw fail('帳號或密碼錯誤。', 401);
-    return json({ success: true }, 200, { 'Set-Cookie': await newSession(request, env, 'admin') });
+    const issued = await newSession(request, env, 'admin');
+    return json({ success: true, token:issued.token }, 200, { 'Set-Cookie':issued.cookie });
   }
   if (path === '/api/state' && method === 'GET') {
     const state = await snapshot(env.DB);
@@ -167,6 +177,12 @@ export default {
       response = json({ error: known ? messages[known] : error.status ? error.message : '系統暫時無法使用，請稍後再試。' }, known ? 409 : error.status || 500);
     }
     const secured = new Response(response.body, response);
+    if (allowedOrigin(request)) {
+      secured.headers.set('Access-Control-Allow-Origin',request.headers.get('origin'));
+      secured.headers.set('Vary','Origin');
+      secured.headers.set('Access-Control-Allow-Methods','GET, POST, OPTIONS');
+      secured.headers.set('Access-Control-Allow-Headers','Content-Type, X-Requested-With, Authorization');
+    }
     secured.headers.set('X-Content-Type-Options','nosniff');
     secured.headers.set('Referrer-Policy','strict-origin-when-cross-origin');
     secured.headers.set('X-Frame-Options','DENY');
@@ -178,6 +194,7 @@ export default {
   },
   async scheduled(event, env, ctx) {
     await env.DB.batch([
+      env.DB.prepare('DELETE FROM login_nonces WHERE expires_at<?').bind(Date.now()),
       env.DB.prepare('DELETE FROM sessions WHERE expires_at<?').bind(Date.now()),
       env.DB.prepare('DELETE FROM login_limits WHERE expires_at<?').bind(Date.now()),
     ]);

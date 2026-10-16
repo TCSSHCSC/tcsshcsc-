@@ -4,20 +4,20 @@ Cloudflare Workers + D1 的社團座位點名系統。學員必須以 `@stu.tcss
 
 ## 正式網站
 
-- 學員 A 班：https://tcsshcsc-attendance.yichengc869.workers.dev/a
-- 學員 B 班：https://tcsshcsc-attendance.yichengc869.workers.dev/b
-- 管理員 A 班：https://tcsshcsc-attendance.yichengc869.workers.dev/admin/a
-- 管理員 B 班：https://tcsshcsc-attendance.yichengc869.workers.dev/admin/b
+- 學員 A 班：https://tcsshcsc.github.io/tcsshcsc-/?room=A
+- 學員 B 班：https://tcsshcsc.github.io/tcsshcsc-/?room=B
+- 管理員 A 班：https://tcsshcsc.github.io/tcsshcsc-/?admin=1&room=A
+- 管理員 B 班：https://tcsshcsc.github.io/tcsshcsc-/?admin=1&room=B
 
 ## 功能
 
-- A、B 教室各 48 席，每排 8 席，共 6 排，左至右、前至後編號 01–48。
+- A、B 教室各 48 席，每排 6 席，共 8 排，左至右、前至後編號 01–48。
 - 紅燈未報到、綠燈已報到、灰燈停用。登入 Google 後點選座位，填寫班級與班級座號。
 - 每場每個 Google 帳號只能占一席，A/B 兩間共用限制；同班級座號不能重複。班級名稱須由學員一致填寫，尚未串接學籍名冊。
 - 管理員帳號 `tcsshcsc`；密碼僅以加鹽 PBKDF2 雜湊存在 Cloudflare secret，公開倉庫不含真實密碼或雜湊。
 - 管理員可停用/恢復空位，查看報到名單、匯出 CSV、同時為兩班開始新場次。歷史紀錄與停用座位保留。
-- 畫面每 7 秒更新；隱藏分頁暫停輪詢。公開 API 不傳回學員姓名、帳號或班級座號。
-- Session 使用 HttpOnly/SameSite Cookie，正式站使用 Secure，8 小時到期。每 IP 每 15 分鐘最多 20 次登入嘗試。
+- 無自動更新或倒數。只有管理員有「更新資料」及「重設點名」按鈕；瀏覽器重新整理不會清除點名。公開 API 不傳回學員姓名、帳號或班級座號。
+- GitHub Pages 使用 sessionStorage 中的 Bearer session（關閉分頁清除），不依賴第三方 Cookie，8 小時到期。API 僅允許指定 GitHub Pages 來源。每 IP 每 15 分鐘最多 20 次登入嘗試。
 - SQLite constraints 與 triggers 原子檢查座位、帳號及班級座號衝突，並拒絕舊場次報到。
 
 ## 開發
@@ -46,7 +46,7 @@ npx wrangler secret put ADMIN_PASSWORD_HASH
 npm run deploy
 ```
 
-既有正式資料庫不需重建。`wrangler.jsonc` 內的 D1 ID 為本專案已建立的資料庫。若複製到其他帳號，請替換 ID，Google OAuth 也需加入新的網站來源。不要在 GitHub Pages 直接部署：後端與 D1 binding 必須在 Workers 執行。
+既有正式資料庫不需重建。`wrangler.jsonc` 內的 D1 ID 為本專案已建立的資料庫。若複製到其他帳號，請替換 ID，Google OAuth 也需加入新的網站來源。前端透過 npm run build 產生 docs/，將 docs/ 一併提交到 main；GitHub Pages 來源設為 main 的 /docs。後端與 D1 binding 在 Workers 執行，舊網站網址轉向 GitHub Pages。
 
 每天 UTC 19:00（台灣 03:00）清除過期 session 與登入限制計數。此排程不刪除點名歷史。可由管理員使用 Cloudflare D1 控制台處理學員的更正或刪除請求。
 
@@ -54,7 +54,7 @@ npm run deploy
 
 Google Cloud 專案：`tcsshcsc-attendance`。OAuth 用戶端：`TCSSHCSC Attendance Web`。
 
-來源：`https://tcsshcsc-attendance.yichengc869.workers.dev`。
+來源：`https://tcsshcsc.github.io`。
 
 後端只接收經驗證的 Google ID token，不接受前端提供的 user ID 或 email。Google Auth Platform 必須允許正式學員使用；使用者身分可能依 Google 設定、帳號政策及 OAuth 傳播時間受到限制。
 
