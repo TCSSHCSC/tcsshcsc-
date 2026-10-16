@@ -38,18 +38,16 @@ function render() {
   const checkins = state?.checkins?.filter(c => c.room === room) || [];
   const grid = $('seat-grid'); grid.replaceChildren();
   for (let row = 0; row < 8; row++) {
-    if (row === 2 || row === 4) {
-      const aisle = document.createElement('div');
-      aisle.className = 'aisle'; aisle.textContent = '走道';
-      grid.append(aisle);
-    }
-    const label = document.createElement('span'); label.className = 'row-label'; label.textContent = String(row+1).padStart(2,'0'); grid.append(label);
+    const label = document.createElement('span'); label.className = 'row-label'; label.textContent = String(row+1).padStart(2,'0'); label.style.gridRow = row+1; grid.append(label);
     for (const seat of seats.slice(row*6,row*6+6)) {
       const checkin = checkins.find(c => c.seat === seat.seat);
       const occupied = !!(seat.occupied || checkin);
       const status = seat.unknown ? '連線中' : seat.blocked ? '停用座位' : occupied ? '已報到' : '未報到';
       const button = document.createElement('button'); button.className = `seat ${seat.blocked?'blocked':occupied?'occupied':''}`;
       if (me?.checkin?.room === room && me.checkin.seat === seat.seat) button.classList.add('mine');
+      const column = (seat.seat - 1) % 6;
+      button.style.setProperty('--seat-column', column + Math.floor(column / 2) + 1);
+      button.style.gridRow = row + 1;
       button.textContent = String(seat.seat).padStart(2,'0');
       button.setAttribute('aria-label', `${room} 班 ${seat.seat} 號，${status}`);
       button.title = adminMode && checkin ? `${checkin.class_name} ${String(checkin.student_number).padStart(2,'0')} 號` : status;
@@ -67,6 +65,12 @@ function render() {
       };
       grid.append(button);
     }
+  }
+  for (const column of [3,6]) {
+    const aisle = document.createElement('div');
+    aisle.className = 'aisle'; aisle.textContent = '走道';
+    aisle.style.setProperty('--seat-column',column);
+    grid.append(aisle);
   }
   if (!state) return;
   const occupied = seats.filter(s => s.occupied || checkins.some(c => c.seat === s.seat)).length;
