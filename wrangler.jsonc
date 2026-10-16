@@ -1,0 +1,13 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "tcsshcsc-attendance",
+  "main": "server/worker.mjs",
+  "compatibility_date": "2026-10-16",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "assets": { "directory": "./dist", "binding": "ASSETS", "run_worker_first": true, "html_handling": "none" },
+  "observability": { "enabled": true, "head_sampling_rate": 1 },
+  "triggers": { "crons": ["0 19 * * *"] },
+  "vars": { "ADMIN_USERNAME": "tcsshcsc", "GOOGLE_CLIENT_ID": "25067656817-e8lkpm5cd7vujn2ls3jp4groqva1ubdq.apps.googleusercontent.com" },
+  "d1_databases": [{ "binding": "DB", "database_name": "tcsshcsc-attendance", "database_id": "d2ad6a7e-80ea-4337-b068-8730b20920a5", "migrations_dir": "migrations" }]
+}

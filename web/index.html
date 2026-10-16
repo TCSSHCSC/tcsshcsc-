@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#173b32"><meta name="description" content="TCSSHCSC 社團點名系統：登入 Google，選擇座位，完成報到。">
+  <title>社團點名系統 · TCSSHCSC</title><link rel="stylesheet" href="/style.css"><script type="module" src="/app.js"></script>
+</head>
+<body>
+  <header><a class="brand" href="/a"><span class="brand-icon">T<span>＋</span></span><span>TCSSHCSC<small>社團點名系統</small></span></a><nav><a id="student-link" href="/a">學員報到</a><a id="admin-link" href="/admin/a">管理中心 <span>↗</span></a></nav></header>
+  <main>
+    <section class="intro"><div><p class="eyebrow" id="eyebrow">CLUB ATTENDANCE / 學員報到</p><h1 id="heading">今天，也一起學習。</h1><p class="muted" id="subtitle">請先登入中二中學生 Google 帳號，驗證身分後再選擇座位。</p></div><div class="date"><span id="today"></span><small>TCSSHCSC · 每一次參與都算數</small></div></section>
+    <section id="login-card" class="login-card"><div class="login-icon">↗</div><div><h2 id="login-title">先登入，再入座</h2><p id="login-description">僅限 @stu.tcssh.tc.edu.tw 的中二中學生帳號。驗證通過後才能選位。</p></div><div id="google-login" class="google-container" tabindex="0">正在準備 Google 登入…</div><button id="student-logout" hidden>登出</button></section>
+    <section id="admin-login-panel" class="panel admin-login" hidden><p class="eyebrow">ADMIN ACCESS</p><h2>管理員登入</h2><p class="muted">登入後可查看報到名單、設定停用座位及開始新場次。</p><form id="admin-form"><label>帳號<input name="username" autocomplete="username" required value="tcsshcsc"></label><label>密碼<input name="password" type="password" autocomplete="current-password" required></label><p id="admin-error" class="error" role="alert"></p><button class="primary">登入管理中心 →</button></form></section>
+    <p id="notice" class="notice" role="status" aria-live="polite" hidden></p>
+    <div id="workspace">
+      <section class="toolbar"><div class="tabs" aria-label="切換教室"><a id="room-a" href="/a">A 班教室 <span>01</span></a><a id="room-b" href="/b">B 班教室 <span>02</span></a></div><div class="sync"><span id="sync-dot"></span><span id="sync-text">正在連線…</span><button id="refresh" aria-label="重新整理座位">↻</button></div></section>
+      <div class="layout"><section class="panel classroom"><div class="panel-head"><div><p class="eyebrow">CLASSROOM <span id="room-letter">A</span></p><h2 id="room-title">A 班座位圖</h2></div><span class="pill">8 列 × 6 排 · 48 席</span></div><div class="front"><span>講台 / FRONT</span></div><div class="seat-scroll"><div class="column-labels"><span></span><span>01</span><span>02</span><span>03</span><span>04</span><span>05</span><span>06</span><span>07</span><span>08</span></div><div id="seat-grid" class="seat-grid" aria-label="教室座位"></div></div><div class="legend"><span><i class="red"></i>未報到</span><span><i class="green"></i>已報到</span><span><i class="gray"></i>停用座位</span></div><p id="seat-help" class="seat-help">請依實際座位選位，每個學生帳號每場限報到一次。</p></section>
+      <aside><section class="panel summary"><p class="eyebrow">LIVE OVERVIEW</p><h2>教室即時概況</h2><div class="count"><strong id="occupied-count">—</strong><span>/ <span id="available-count">48</span> 席已報到</span></div><div class="progress"><div id="progress-fill"></div></div><div class="stats"><div><span><i class="red"></i>尚未報到</span><b id="empty-count">—</b></div><div><span><i class="gray"></i>停用座位</span><b id="blocked-count">—</b></div></div><div class="round"><span>本次點名</span><strong id="round-name">正在載入</strong><small id="round-time"></small></div></section>
+      <section class="guide" id="guide"><p class="eyebrow">THREE SIMPLE STEPS</p><h3>報到，就是這麼簡單。</h3><ol><li><span>01</span><div><b>登入 Google</b><small>使用中二中學生帳號</small></div></li><li><span>02</span><div><b>選擇實際座位</b><small>確認 A、B 班教室與位置</small></div></li><li><span>03</span><div><b>填寫班級與座號</b><small>亮起綠燈，就完成報到囉</small></div></li></ol></section>
+      <section class="panel admin-actions" id="admin-actions" hidden><h3>場次管理</h3><p class="muted">開始新場次會清空兩間教室的本次報到，歷史紀錄及停用座位會保留。</p><button id="new-round">開始新一輪點名</button><label>匯出場次<select id="history"></select></label><button id="export">下載點名 CSV ↓</button><button id="admin-logout" class="quiet">登出管理員</button></section></aside></div>
+      <section class="panel records" id="records" hidden><div class="panel-head"><h2>本班報到名單</h2><span class="muted">僅管理員可見</span></div><div class="table-scroll"><table><thead><tr><th>座位</th><th>班級</th><th>座號</th><th>Google 帳號</th><th>報到時間</th></tr></thead><tbody id="records-body"></tbody></table><p id="no-records" class="muted">本班尚無報到紀錄。</p></div></section>
+    </div>
+  </main><footer><span>TCSSHCSC · 社團點名系統</span><span><a href="/privacy.html">隱私權說明</a> · <a href="/terms.html">使用說明</a></span></footer>
+  <dialog id="seat-dialog"><form id="seat-form"><button type="button" class="close" aria-label="關閉視窗">×</button><p class="eyebrow">CHECK IN</p><h2 id="dialog-title">確認你的座位</h2><p class="muted" id="dialog-description">請填寫學校班級與班級座號。</p><div id="student-fields"><label>班級<input id="class-name" name="className" maxlength="20" placeholder="例如：一年三班" required></label><label>班級座號<input id="student-number" name="studentNumber" type="number" min="1" max="99" step="1" placeholder="例如：12" required></label></div><p id="dialog-error" class="error" role="alert"></p><button id="confirm-seat" class="primary">確認報到 →</button></form></dialog>
+  <dialog id="round-dialog"><form id="round-form"><button type="button" class="close" aria-label="關閉視窗">×</button><p class="eyebrow">NEW SESSION</p><h2>開始新一輪點名？</h2><p class="muted">A、B 兩班會同時開始新場次。舊紀錄會保留，可從「匯出場次」下載；停用座位不變。</p><p id="round-error" class="error" role="alert"></p><button class="primary">確認開始新場次</button></form></dialog>
+</body></html>
+
+
+

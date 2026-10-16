@@ -1,0 +1,3 @@
+# Copy to .dev.vars, never commit secrets.
+ADMIN_PASSWORD_HASH=
+GOOGLE_CLIENT_ID=
