@@ -160,3 +160,23 @@ test('admin cancels only the selected checkin and stale cancellation cannot remo
  assert.equal((await call('/api/admin/cancel',body,admin)).status,409);
  assert.equal((await (await call('/api/admin/state',undefined,admin)).json()).checkins.length,2);
 });
+
+
+test('students cancel only their own current checkin and can choose again',async()=>{
+ const {call,auth}=await setup();const a=await auth('student','a'),b=await auth('student','b');
+ const original={roundId:1,room:'A',seat:1,className:'101',studentNumber:1};
+ await call('/api/checkin',original,a);
+ await call('/api/checkin',{...original,seat:2,studentNumber:2},b);
+ const mine=(await (await call('/api/me',undefined,a)).json()).checkin;
+ const body={room:'A',seat:1,roundId:1,checkinId:mine.id};
+ assert.equal((await call('/api/checkin/cancel',body)).status,401);
+ assert.equal((await call('/api/checkin/cancel',body,b)).status,409);
+ assert.equal((await call('/api/checkin/cancel',{...body,roundId:2},a)).status,409);
+ assert.equal((await call('/api/checkin/cancel',body,a)).status,200);
+ assert.equal((await (await call('/api/me',undefined,a)).json()).checkin,null);
+ assert.equal((await (await call('/api/me',undefined,b)).json()).checkin.seat,2);
+ assert.equal((await call('/api/checkin',{...original,room:'B',seat:3},a)).status,200);
+ assert.equal((await call('/api/checkin/cancel',body,a)).status,409);
+ assert.equal((await (await call('/api/me',undefined,a)).json()).checkin.seat,3);
+ assert.equal((await call('/api/checkin',{...original,seat:4},a)).status,409);
+});

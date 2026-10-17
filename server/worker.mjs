@@ -125,6 +125,14 @@ export async function route(request, env, ctx) {
     await env.DB.prepare('DELETE FROM sessions WHERE token_hash=?').bind(user.token_hash).run();
     return json({ success: true }, 200, { 'Set-Cookie': cookie(request, 'attendance_student', '', 0) });
   }
+  if (path === '/api/checkin/cancel' && method === 'POST') {
+    const user = await session(request, env, 'student');
+    const body = await bodyJson(request); seatInput(body);
+    if (!Number.isSafeInteger(body.checkinId) || body.checkinId < 1 || !Number.isSafeInteger(body.roundId) || body.roundId < 1) throw fail('劃位資料不正確。');
+    const result = await env.DB.prepare('DELETE FROM checkins WHERE id=? AND user_id=? AND room=? AND seat=? AND round_id=? AND round_id=(SELECT current_round FROM settings WHERE id=1)').bind(body.checkinId,user.user_id,body.room,body.seat,body.roundId).run();
+    if (!result.meta.changes) throw fail('劃位已變更或不是你的座位，請重新整理。',409);
+    return json({success:true});
+  }
   if (path === '/api/checkin' && method === 'POST') {
     const user = await session(request, env, 'student');
     const body = studentInput(await bodyJson(request));
