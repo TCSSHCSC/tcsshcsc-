@@ -144,6 +144,13 @@ export async function route(request, env, ctx) {
       await env.DB.prepare('UPDATE seats SET blocked=? WHERE room=? AND seat=?').bind(body.blocked ? 1 : 0, body.room, body.seat).run();
       return json({ success: true });
     }
+    if (path === '/api/admin/cancel' && method === 'POST') {
+      const body = await bodyJson(request); seatInput(body);
+      if (!Number.isSafeInteger(body.checkinId) || body.checkinId < 1 || !Number.isSafeInteger(body.roundId) || body.roundId < 1) throw fail('劃位資料不正確。');
+      const result = await env.DB.prepare('DELETE FROM checkins WHERE id=? AND room=? AND seat=? AND round_id=? AND round_id=(SELECT current_round FROM settings WHERE id=1)').bind(body.checkinId,body.room,body.seat,body.roundId).run();
+      if (!result.meta.changes) throw fail('劃位已變更，請更新資料後再操作。',409);
+      return json({success:true});
+    }
     if (path === '/api/admin/round' && method === 'POST') {
       const { roundId } = await bodyJson(request);
       if (!Number.isSafeInteger(roundId) || roundId < 1) throw fail('場次不正確。');

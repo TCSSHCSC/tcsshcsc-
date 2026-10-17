@@ -53,14 +53,14 @@ function render() {
       button.title = adminMode && checkin ? `${checkin.class_name} ${String(checkin.student_number).padStart(2,'0')} 號` : status;
       button.disabled = !!seat.unknown || (adminMode ? !adminLoggedIn : !me || seat.blocked || occupied || !!me?.checkin);
       button.onclick = () => {
-        if (adminMode && occupied) { notice(`${room} 班 ${seat.seat} 號：${checkin.class_name} ${String(checkin.student_number).padStart(2,'0')} 號，${checkin.email}`); return; }
+
         if (!adminMode && !me) { notice('請先登入 Google 帳號，再選擇座位。'); $('google-login').focus(); return; }
-        selected = {...seat,roundId:state.round.id};
+        selected = {...seat,roundId:state.round.id,checkinId:checkin?.id};
         text('dialog-title', `${room} 班 · ${String(seat.seat).padStart(2,'0')} 號座位`);
-        text('dialog-description', adminMode ? seat.blocked ? '將這個座位恢復為可供學員報到。' : '將這個座位標示為灰燈，學員將無法選取。' : '請填寫學校班級與班級座號。確認後每場限報到一次。');
+        text('dialog-description', adminMode ? occupied ? `${checkin.class_name} 班 ${String(checkin.student_number).padStart(2,'0')} 號 · ${checkin.email}。取消後只清除此人的劃位，其他座位不受影響。` : seat.blocked ? '將這個座位恢復為可供學員報到。' : '將這個座位標示為灰燈，學員將無法選取。' : '請填寫學校班級與班級座號。確認後每場限報到一次。');
         $('student-fields').hidden = adminMode;
         $('class-name').required = !adminMode; $('student-number').required = !adminMode;
-        text('confirm-seat', adminMode ? seat.blocked ? '恢復使用' : '設為停用座位' : '確認報到 →');
+        text('confirm-seat', adminMode ? occupied ? '取消劃位' : seat.blocked ? '恢復使用' : '設為停用座位' : '確認報到 →');
         text('dialog-error',''); $('seat-dialog').showModal();
       };
       grid.append(button);
@@ -78,7 +78,7 @@ function render() {
   text('reset-text',state.round.id === 1 ? '尚未重置' : `重置於 ${time(state.round.started_at)}`);
   if (adminMode) {
     $('records-body').replaceChildren();
-    const sortedCheckins = [...checkins].sort((a,b) => Number(a.class_name) - Number(b.class_name) || a.student_number - b.student_number || a.seat - b.seat);
+    const sortedCheckins = [...checkins].sort((a,b) => Math.floor(Number(a.class_name)/100) - Math.floor(Number(b.class_name)/100) || Number(a.class_name)%100 - Number(b.class_name)%100 || a.student_number - b.student_number || a.seat - b.seat);
     for (const c of sortedCheckins) {
       const tr = document.createElement('tr');
       for (const value of [`${room}-${String(c.seat).padStart(2,'0')}`,c.class_name,String(c.student_number).padStart(2,'0'),c.email,time(c.checked_in_at)]) {
@@ -129,9 +129,10 @@ async function initGoogle(clientId) {
 }
 $('seat-form').onsubmit = event => { event.preventDefault(); task($('confirm-seat'), async () => {
   text('dialog-error','');
-  if (adminMode) await api('/api/admin/seat',{room,seat:selected.seat,blocked:!selected.blocked});
+  if (adminMode && selected.checkinId) await api('/api/admin/cancel',{room,seat:selected.seat,roundId:selected.roundId,checkinId:selected.checkinId});
+  else if (adminMode) await api('/api/admin/seat',{room,seat:selected.seat,blocked:!selected.blocked});
   else await api('/api/checkin',{room,seat:selected.seat,roundId:selected.roundId,className:$('class-name').value,studentNumber:Number($('student-number').value)});
-  $('seat-dialog').close(); notice(adminMode ? '座位設定已更新。' : '已完成點名。',true); await refresh();
+  $('seat-dialog').close(); notice(adminMode ? selected.checkinId ? '已取消劃位。' : '座位設定已更新。' : '已完成點名。',true); await refresh();
 }, 'dialog-error'); };
 $('admin-form').onsubmit = event => { event.preventDefault(); task(event.submitter, async () => {
   text('admin-error',''); const form = new FormData(event.currentTarget);

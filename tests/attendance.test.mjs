@@ -142,3 +142,21 @@ test('class must be three digits and school seat number must be 1 to 99',async()
  assert.equal((await call('/api/checkin',body,student)).status,200);
  const me=await (await call('/api/me',undefined,student)).json();assert.equal(me.checkin.class_name,'212');assert.equal(me.checkin.student_number,2);
 });
+
+
+test('admin cancels only the selected checkin and stale cancellation cannot remove a replacement',async()=>{
+ const {call,auth}=await setup();const admin=await auth('admin'),a=await auth('student','a'),b=await auth('student','b');
+ await call('/api/checkin',{roundId:1,room:'A',seat:1,className:'101',studentNumber:1},a);
+ await call('/api/checkin',{roundId:1,room:'B',seat:2,className:'201',studentNumber:2},b);
+ const before=await (await call('/api/admin/state',undefined,admin)).json();
+ const target=before.checkins.find(c=>c.room==='A');const body={room:'A',seat:1,roundId:1,checkinId:target.id};
+ assert.equal((await call('/api/admin/cancel',body)).status,401);
+ assert.equal((await call('/api/admin/cancel',body,b)).status,401);
+ assert.equal((await call('/api/admin/cancel',{...body,seat:3},admin)).status,409);
+ assert.equal((await call('/api/admin/cancel',body,admin)).status,200);
+ const after=await (await call('/api/admin/state',undefined,admin)).json();assert.equal(after.round.id,1);assert.equal(after.checkins.length,1);assert.equal(after.checkins[0].room,'B');
+ assert.equal((await (await call('/api/me',undefined,a)).json()).checkin,null);
+ await call('/api/checkin',{roundId:1,room:'A',seat:1,className:'101',studentNumber:1},a);
+ assert.equal((await call('/api/admin/cancel',body,admin)).status,409);
+ assert.equal((await (await call('/api/admin/state',undefined,admin)).json()).checkins.length,2);
+});
