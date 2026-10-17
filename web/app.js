@@ -78,7 +78,8 @@ function render() {
   text('reset-text',state.round.id === 1 ? '尚未重置' : `重置於 ${time(state.round.started_at)}`);
   if (adminMode) {
     $('records-body').replaceChildren();
-    for (const c of checkins) {
+    const sortedCheckins = [...checkins].sort((a,b) => Number(a.class_name) - Number(b.class_name) || a.student_number - b.student_number || a.seat - b.seat);
+    for (const c of sortedCheckins) {
       const tr = document.createElement('tr');
       for (const value of [`${room}-${String(c.seat).padStart(2,'0')}`,c.class_name,String(c.student_number).padStart(2,'0'),c.email,time(c.checked_in_at)]) {
         const td = document.createElement('td'); td.dataset.label = ['座位','班級','座號','Google 帳號','報到時間'][tr.children.length]; td.textContent = value; tr.append(td);
