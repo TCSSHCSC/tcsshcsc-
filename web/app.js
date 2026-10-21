@@ -151,9 +151,21 @@ text('today',new Date().toLocaleDateString('zh-TW',{timeZone:'Asia/Taipei',year:
 text('count-room',room); text('room-letter',room); text('room-title',`${room} 班座位圖`);
 $(`room-${room.toLowerCase()}`).classList.add('active');
 $(adminMode?'admin-link':'student-link').classList.add('active');
+// Keep navigation on this release instead of cached classroom HTML.
+const pageVersion = new URL(import.meta.url).searchParams.get('v');
+function versionNavigation() {
+  if (!pageVersion) return;
+  for (const link of document.querySelectorAll('a[href^="?"]')) {
+    const url = new URL(link.href);
+    url.searchParams.set('v', pageVersion);
+    link.href = url.href;
+  }
+}
+versionNavigation();
 if (adminMode) {
   text('eyebrow','CLUB ATTENDANCE / 管理中心'); text('heading','管理員後台'); text('subtitle','');
   $('login-card').hidden=true; $('guide').hidden=true; $('room-a').href='?admin=1&room=A'; $('room-b').href='?admin=1&room=B';
+  versionNavigation();
   text('seat-help','點選紅燈座位可停用，灰燈可恢復使用；綠燈可查看學員資料。');
   adminUI(false);
   if (sessionStorage.getItem(tokenKey)) $('admin-login-panel').hidden=true;
