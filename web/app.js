@@ -2,6 +2,7 @@ const $ = id => document.getElementById(id);
 const params = new URLSearchParams(location.search);
 const adminMode = params.get('admin') === '1';
 const room = params.get('room') === 'B' ? 'B' : 'A';
+const roomName = value => value === 'B' ? 'Python' : 'C++';
 const API = location.hostname.endsWith('github.io') ? 'https://tcsshcsc-attendance.yichengc869.workers.dev' : '';
 const tokenKey = adminMode ? 'attendance_admin' : 'attendance_student';
 const authHeaders = () => sessionStorage.getItem(tokenKey) ? {Authorization:'Bearer '+sessionStorage.getItem(tokenKey)} : {};
@@ -30,7 +31,7 @@ function signedInUI() {
   if (me?.checkin) {
     const c = me.checkin;
     text('login-title', '已完成點名');
-    text('login-description', `${me.email} · ${c.room} 班 ${String(c.seat).padStart(2,'0')} 號座位 · ${c.class_name} ${String(c.student_number).padStart(2,'0')} 號`);
+    text('login-description', `${me.email} · ${roomName(c.room)} 班 ${String(c.seat).padStart(2,'0')} 號座位 · ${c.class_name} ${String(c.student_number).padStart(2,'0')} 號`);
   }
 }
 function render() {
@@ -50,18 +51,21 @@ function render() {
       button.style.setProperty('--seat-column', column + Math.floor(column / 2) + 1);
       button.style.gridRow = row + 1;
       button.textContent = String(seat.seat).padStart(2,'0');
-      button.setAttribute('aria-label', `${room} 班 ${seat.seat} 號，${status}`);
+      button.setAttribute('aria-label', `${roomName(room)} 班 ${seat.seat} 號，${status}`);
       button.title = adminMode && checkin ? `${checkin.class_name} ${String(checkin.student_number).padStart(2,'0')} 號` : status;
       button.disabled = !!seat.unknown || (adminMode ? !adminLoggedIn : !me || (!mine && (seat.blocked || occupied || !!me?.checkin)));
       button.onclick = () => {
 
         if (!adminMode && !me) { notice('請先登入 Google 帳號，再選擇座位。'); $('google-login').focus(); return; }
         selected = {...seat,roundId:state.round.id,checkinId:adminMode ? checkin?.id : mine ? me.checkin.id : undefined,cancelMine:!adminMode && mine};
-        text('dialog-title', `${room} 班 · ${String(seat.seat).padStart(2,'0')} 號座位`);
-        text('dialog-description', adminMode ? occupied ? `${checkin.class_name} 班 ${String(checkin.student_number).padStart(2,'0')} 號 · ${checkin.email}。取消後只清除此人的劃位，其他座位不受影響。` : seat.blocked ? '將這個座位恢復為可供學員報到。' : '將這個座位標示為灰燈，學員將無法選取。' : mine ? '取消後可重新選擇座位。' : '請填寫學校班級與班級座號。');
-        $('student-fields').hidden = adminMode || mine;
-        $('class-name').required = !adminMode && !mine; $('student-number').required = !adminMode && !mine;
-        text('confirm-seat', adminMode ? occupied ? '取消劃位' : seat.blocked ? '恢復使用' : '設為停用座位' : mine ? '取消我的劃位' : '確認報到 →');
+        text('dialog-title', `${roomName(room)} 班 · ${String(seat.seat).padStart(2,'0')} 號座位`);
+        text('dialog-description', adminMode ? occupied ? `${checkin.student_name || '未填姓名'} · ${checkin.class_name} 班 ${String(checkin.student_number).padStart(2,'0')} 號 · ${checkin.email || '管理員代劃位'}。取消後只清除此人的劃位，其他座位不受影響。` : seat.blocked ? '將這個座位恢復為可供學員報到。' : '請填寫姓名、班級與座號。' : mine ? '取消後可重新選擇座位。' : '請填寫姓名、班級與座號。');
+        const entering = adminMode ? !occupied && !seat.blocked : !mine;
+        $('seat-form').reset();
+        $('student-fields').hidden = !entering;
+        for (const id of ['student-name','class-name','student-number']) $(id).required = entering;
+        $('block-seat').hidden = !adminMode || occupied || seat.blocked;
+        text('confirm-seat', adminMode ? occupied ? '取消劃位' : seat.blocked ? '恢復使用' : '確認劃位' : mine ? '取消我的劃位' : '確認報到 →');
         text('dialog-error',''); $('seat-dialog').showModal();
       };
       grid.append(button);
@@ -82,8 +86,8 @@ function render() {
     const sortedCheckins = [...checkins].sort((a,b) => Math.floor(Number(a.class_name)/100) - Math.floor(Number(b.class_name)/100) || Number(a.class_name)%100 - Number(b.class_name)%100 || a.student_number - b.student_number || a.seat - b.seat);
     for (const c of sortedCheckins) {
       const tr = document.createElement('tr');
-      for (const value of [`${room}-${String(c.seat).padStart(2,'0')}`,c.class_name,String(c.student_number).padStart(2,'0'),c.email,time(c.checked_in_at)]) {
-        const td = document.createElement('td'); td.dataset.label = ['座位','班級','座號','Google 帳號','報到時間'][tr.children.length]; td.textContent = value; tr.append(td);
+      for (const value of [`${roomName(room)}-${String(c.seat).padStart(2,'0')}`,c.student_name || '未填姓名',c.class_name,String(c.student_number).padStart(2,'0'),c.email || '管理員代劃位',time(c.checked_in_at)]) {
+        const td = document.createElement('td'); td.dataset.label = ['座位','姓名','班級','座號','Google 帳號','報到時間'][tr.children.length]; td.textContent = value; tr.append(td);
       }
       $('records-body').append(tr);
     }
@@ -131,11 +135,15 @@ async function initGoogle(clientId) {
 $('seat-form').onsubmit = event => { event.preventDefault(); task($('confirm-seat'), async () => {
   text('dialog-error','');
   if (adminMode && selected.checkinId) await api('/api/admin/cancel',{room,seat:selected.seat,roundId:selected.roundId,checkinId:selected.checkinId});
-  else if (adminMode) await api('/api/admin/seat',{room,seat:selected.seat,blocked:!selected.blocked});
+  else if (adminMode && selected.blocked) await api('/api/admin/seat',{room,seat:selected.seat,blocked:!selected.blocked});
   else if (selected.cancelMine) await api('/api/checkin/cancel',{room,seat:selected.seat,roundId:selected.roundId,checkinId:selected.checkinId});
-  else await api('/api/checkin',{room,seat:selected.seat,roundId:selected.roundId,className:$('class-name').value,studentNumber:Number($('student-number').value)});
+  else await api(adminMode ? '/api/admin/checkin' : '/api/checkin',{room,seat:selected.seat,roundId:selected.roundId,studentName:$('student-name').value,className:$('class-name').value,studentNumber:Number($('student-number').value)});
   $('seat-dialog').close(); notice(adminMode ? selected.checkinId ? '已取消劃位。' : '座位設定已更新。' : selected.cancelMine ? '已取消，可重新選位。' : '已完成點名。',true); await refresh();
 }, 'dialog-error'); };
+$('block-seat').onclick = event => task(event.currentTarget, async () => {
+  await api('/api/admin/seat',{room,seat:selected.seat,blocked:true});
+  $('seat-dialog').close(); await refresh();
+}, 'dialog-error');
 $('admin-form').onsubmit = event => { event.preventDefault(); task(event.submitter, async () => {
   text('admin-error',''); const form = new FormData(event.currentTarget);
   await api('/api/admin/login',{username:form.get('username'),password:form.get('password')}); $('admin-form').elements.password.value='';
@@ -148,7 +156,7 @@ $('new-round').onclick = () => { text('round-error',''); $('round-dialog').datas
 $('round-form').onsubmit = event => { event.preventDefault(); task(event.submitter, async () => { await api('/api/admin/round',{roundId:Number($('round-dialog').dataset.roundId)}); $('round-dialog').close(); await refresh(); notice('兩班點名資料已清空。停用座位已保留。',true); }, 'round-error'); };
 for (const button of document.querySelectorAll('.close')) button.onclick = () => button.closest('dialog').close();
 text('today',new Date().toLocaleDateString('zh-TW',{timeZone:'Asia/Taipei',year:'numeric',month:'long',day:'numeric',weekday:'long'}));
-text('count-room',room); text('room-letter',room); text('room-title',`${room} 班座位圖`);
+text('count-room',roomName(room)); text('room-letter',roomName(room)); text('room-title',`${roomName(room)} 班座位圖`);
 $(`room-${room.toLowerCase()}`).classList.add('active');
 $(adminMode?'admin-link':'student-link').classList.add('active');
 // Keep navigation on this release instead of cached classroom HTML.

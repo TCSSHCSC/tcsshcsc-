@@ -1,0 +1,1 @@
+ALTER TABLE checkins ADD COLUMN student_name TEXT NOT NULL DEFAULT '';

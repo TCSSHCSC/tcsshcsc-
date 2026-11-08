@@ -10,6 +10,7 @@ function database() {
   sqlite.exec('PRAGMA foreign_keys=ON;');
   sqlite.exec(readFileSync(new URL('../migrations/0001_attendance.sql',import.meta.url),'utf8'));
   sqlite.exec(readFileSync(new URL('../migrations/0002_login_nonces.sql',import.meta.url),'utf8'));
+  sqlite.exec(readFileSync(new URL('../migrations/0004_student_name.sql',import.meta.url),'utf8'));
   const wrap = (sql, args=[]) => ({
     bind: (...values) => wrap(sql,values),
     first: async () => sqlite.prepare(sql).get(...args) || null,
@@ -40,7 +41,7 @@ async function setup() {
 }
 test('public state has exactly two 6×8 rooms and never exposes student information',async()=>{
   const {call,auth}=await setup();const student=await auth('student');
-  assert.equal((await call('/api/checkin',{roundId:1,room:'A',seat:1,className:'103',studentNumber:1},student)).status,200);
+  assert.equal((await call('/api/checkin',{studentName:'測試學員',roundId:1,room:'A',seat:1,className:'103',studentNumber:1},student)).status,200);
   const response=await call('/api/state');const body=await response.json();
   assert.equal(body.seats.length,96);assert.equal(body.seats.filter(s=>s.room==='A').length,48);assert.equal(body.seats[0].occupied,true);
   assert.ok(!JSON.stringify(body).includes('test@stu.tcssh.tc.edu.tw'));assert.ok(!('checkins' in body));
@@ -56,7 +57,7 @@ test('anonymous, forged Google tokens, wrong admin passwords and cross-origin wr
 });
 test('one account across both rooms, one student identity and one occupant per seat',async()=>{
   const {call,auth}=await setup();const a=await auth('student','a'),b=await auth('student','b');
-  const first={roundId:1,room:'A',seat:2,className:'103',studentNumber:2};
+  const first={studentName:'測試學員',roundId:1,room:'A',seat:2,className:'103',studentNumber:2};
   const race=await Promise.all([call('/api/checkin',first,a),call('/api/checkin',{...first,className:'104'},b)]);
   assert.deepEqual(race.map(r=>r.status).sort(),[200,409]);
   assert.equal((await call('/api/checkin',{...first,room:'B',seat:3},a)).status,409);
@@ -67,7 +68,7 @@ test('admin can disable/enable seats; occupied seats cannot be disabled',async()
   const {call,auth}=await setup();const admin=await auth('admin'),student=await auth('student');
   assert.equal((await call('/api/admin/seat',{room:'B',seat:8,blocked:true},student)).status,401);
   assert.equal((await call('/api/admin/seat',{room:'B',seat:8,blocked:true},admin)).status,200);
-  const checkin={roundId:1,room:'B',seat:8,className:'103',studentNumber:8};
+  const checkin={studentName:'測試學員',roundId:1,room:'B',seat:8,className:'103',studentNumber:8};
   assert.equal((await call('/api/checkin',checkin,student)).status,409);
   assert.equal((await call('/api/admin/seat',{room:'B',seat:8,blocked:false},admin)).status,200);
   assert.equal((await call('/api/checkin',checkin,student)).status,200);
@@ -75,17 +76,17 @@ test('admin can disable/enable seats; occupied seats cannot be disabled',async()
 });
 test('reset deletes attendance and retains only current state and blocked seats',async()=>{
   const {call,auth,DB}=await setup();const admin=await auth('admin'),student=await auth('student');
-  await call('/api/checkin',{roundId:1,room:'A',seat:1,className:'103',studentNumber:1},student);
+  await call('/api/checkin',{studentName:'測試學員',roundId:1,room:'A',seat:1,className:'103',studentNumber:1},student);
   await call('/api/admin/seat',{room:'B',seat:48,blocked:true},admin);
   assert.equal((await call('/api/admin/round',{roundId:1},admin)).status,200);
   assert.equal((await call('/api/admin/round',{roundId:1},admin)).status,409);
-  assert.equal((await call('/api/checkin',{roundId:1,room:'A',seat:2,className:'103',studentNumber:1},student)).status,409);
+  assert.equal((await call('/api/checkin',{studentName:'測試學員',roundId:1,room:'A',seat:2,className:'103',studentNumber:1},student)).status,409);
   const state=await (await call('/api/state')).json();assert.equal(state.round.id,2);assert.ok(state.seats.every(s=>!s.occupied));assert.equal(state.seats.at(-1).blocked,true);
   assert.equal(DB.sqlite.prepare('SELECT count(*) AS n FROM checkins').get().n,0);
   assert.equal(DB.sqlite.prepare('SELECT count(*) AS n FROM rounds').get().n,1);
   assert.equal((await call('/api/admin/history',undefined,admin)).status,404);
   assert.equal((await call('/api/admin/export?round=1',undefined,admin)).status,404);
-  assert.equal((await call('/api/checkin',{roundId:2,room:'B',seat:1,className:'103',studentNumber:1},student)).status,200);
+  assert.equal((await call('/api/checkin',{studentName:'測試學員',roundId:2,room:'B',seat:1,className:'103',studentNumber:1},student)).status,200);
   assert.equal((await call('/api/admin/round',{roundId:2},admin)).status,200);
   assert.equal(DB.sqlite.prepare('SELECT count(*) AS n FROM checkins').get().n,0);
   assert.equal(DB.sqlite.prepare('SELECT count(*) AS n FROM rounds').get().n,1);
@@ -110,7 +111,7 @@ test('only verified Google Workspace student identities are accepted',async()=>{
   assert.equal(verifySchoolIdentity({...valid,hd:undefined}),false);
   const {call,auth}=await setup();const oldPersonalSession=await auth('student','personal','personal@gmail.com');
   assert.equal((await call('/api/me',undefined,oldPersonalSession)).status,403);
-  assert.equal((await call('/api/checkin',{roundId:1,room:'A',seat:1,className:'103',studentNumber:1},oldPersonalSession)).status,403);
+  assert.equal((await call('/api/checkin',{studentName:'測試學員',roundId:1,room:'A',seat:1,className:'103',studentNumber:1},oldPersonalSession)).status,403);
 });
 
 
@@ -136,7 +137,7 @@ test('GitHub Pages CORS and bearer sessions enforce admin-only reset',async()=>{
 
 test('class must be three digits and school seat number must be 1 to 99',async()=>{
  const {call,auth}=await setup();const student=await auth('student');
- const body={roundId:1,room:'A',seat:1,className:'212',studentNumber:2};
+ const body={studentName:'測試學員',roundId:1,room:'A',seat:1,className:'212',studentNumber:2};
  for(const className of ['二年十二班','21','2121','2A2']) assert.equal((await call('/api/checkin',{...body,className},student)).status,400);
  for(const studentNumber of [0,100,1.5,'02']) assert.equal((await call('/api/checkin',{...body,studentNumber},student)).status,400);
  assert.equal((await call('/api/checkin',body,student)).status,200);
@@ -146,8 +147,8 @@ test('class must be three digits and school seat number must be 1 to 99',async()
 
 test('admin cancels only the selected checkin and stale cancellation cannot remove a replacement',async()=>{
  const {call,auth}=await setup();const admin=await auth('admin'),a=await auth('student','a'),b=await auth('student','b');
- await call('/api/checkin',{roundId:1,room:'A',seat:1,className:'101',studentNumber:1},a);
- await call('/api/checkin',{roundId:1,room:'B',seat:2,className:'201',studentNumber:2},b);
+ await call('/api/checkin',{studentName:'測試學員',roundId:1,room:'A',seat:1,className:'101',studentNumber:1},a);
+ await call('/api/checkin',{studentName:'測試學員',roundId:1,room:'B',seat:2,className:'201',studentNumber:2},b);
  const before=await (await call('/api/admin/state',undefined,admin)).json();
  const target=before.checkins.find(c=>c.room==='A');const body={room:'A',seat:1,roundId:1,checkinId:target.id};
  assert.equal((await call('/api/admin/cancel',body)).status,401);
@@ -156,7 +157,7 @@ test('admin cancels only the selected checkin and stale cancellation cannot remo
  assert.equal((await call('/api/admin/cancel',body,admin)).status,200);
  const after=await (await call('/api/admin/state',undefined,admin)).json();assert.equal(after.round.id,1);assert.equal(after.checkins.length,1);assert.equal(after.checkins[0].room,'B');
  assert.equal((await (await call('/api/me',undefined,a)).json()).checkin,null);
- await call('/api/checkin',{roundId:1,room:'A',seat:1,className:'101',studentNumber:1},a);
+ await call('/api/checkin',{studentName:'測試學員',roundId:1,room:'A',seat:1,className:'101',studentNumber:1},a);
  assert.equal((await call('/api/admin/cancel',body,admin)).status,409);
  assert.equal((await (await call('/api/admin/state',undefined,admin)).json()).checkins.length,2);
 });
@@ -164,7 +165,7 @@ test('admin cancels only the selected checkin and stale cancellation cannot remo
 
 test('students cancel only their own current checkin and can choose again',async()=>{
  const {call,auth}=await setup();const a=await auth('student','a'),b=await auth('student','b');
- const original={roundId:1,room:'A',seat:1,className:'101',studentNumber:1};
+ const original={studentName:'測試學員',roundId:1,room:'A',seat:1,className:'101',studentNumber:1};
  await call('/api/checkin',original,a);
  await call('/api/checkin',{...original,seat:2,studentNumber:2},b);
  const mine=(await (await call('/api/me',undefined,a)).json()).checkin;
@@ -179,4 +180,28 @@ test('students cancel only their own current checkin and can choose again',async
  assert.equal((await call('/api/checkin/cancel',body,a)).status,409);
  assert.equal((await (await call('/api/me',undefined,a)).json()).checkin.seat,3);
  assert.equal((await call('/api/checkin',{...original,seat:4},a)).status,409);
+});
+
+test('names are required and admin assignments enforce identity, seat and round guards',async()=>{
+ const {call,auth}=await setup(); const admin=await auth('admin'),student=await auth('student');
+ const body={studentName:' 王小明 ',roundId:1,room:'B',seat:4,className:'212',studentNumber:2};
+ for(const studentName of [undefined,'   ','x'.repeat(51)]) {
+  assert.equal((await call('/api/checkin',{...body,studentName},student)).status,400);
+  assert.equal((await call('/api/admin/checkin',{...body,studentName},admin)).status,400);
+ }
+ assert.equal((await call('/api/admin/checkin',body,student)).status,401);
+ assert.equal((await call('/api/admin/checkin',body)).status,401);
+ assert.equal((await call('/api/admin/checkin',body,admin)).status,200);
+ assert.equal((await call('/api/checkin',{...body,seat:5},student)).status,409);
+ assert.equal((await call('/api/admin/checkin',{...body,room:'A',seat:5},admin)).status,409);
+ assert.equal((await call('/api/admin/checkin',{...body,studentNumber:3},admin)).status,409);
+ await call('/api/admin/seat',{room:'B',seat:6,blocked:true},admin);
+ assert.equal((await call('/api/admin/checkin',{...body,seat:6,studentNumber:3},admin)).status,409);
+ assert.equal((await call('/api/admin/checkin',{...body,seat:7,studentNumber:3,roundId:2},admin)).status,409);
+ const state=await (await call('/api/admin/state',undefined,admin)).json();
+ const c=state.checkins[0]; assert.equal(c.student_name,'王小明'); assert.equal(c.email,'');
+ assert.ok(!JSON.stringify(await (await call('/api/state')).json()).includes('王小明'));
+ assert.equal((await call('/api/admin/cancel',{room:'B',seat:4,roundId:1,checkinId:c.id},admin)).status,200);
+ assert.equal((await call('/api/checkin',body,student)).status,200);
+ assert.equal((await (await call('/api/me',undefined,student)).json()).checkin.student_name,'王小明');
 });

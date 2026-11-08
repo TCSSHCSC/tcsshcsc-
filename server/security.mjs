@@ -31,5 +31,7 @@ export function studentInput(body) {
   const className = typeof body.className === 'string' ? body.className.trim() : '';
   if (!/^[0-9]{3}$/.test(className) || !Number.isInteger(body.studentNumber) || body.studentNumber < 1 || body.studentNumber > 99) throw Object.assign(new Error('班級請輸入 3 位數字（例如 212），座號請輸入 01–99。'), { status: 400 });
   if (!Number.isInteger(body.roundId) || body.roundId < 1) throw Object.assign(new Error('請重新整理點名場次。'), { status: 400 });
-  return { ...body, className };
+  const studentName = typeof body.studentName === 'string' ? body.studentName.trim() : '';
+  if (!studentName || studentName.length > 50 || /[\u0000-\u001f\u007f]/.test(studentName)) throw Object.assign(new Error('請輸入姓名（最多 50 字）。'), { status: 400 });
+  return { ...body, className, studentName };
 }

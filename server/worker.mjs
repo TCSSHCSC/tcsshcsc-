@@ -136,7 +136,7 @@ export async function route(request, env, ctx) {
   if (path === '/api/checkin' && method === 'POST') {
     const user = await session(request, env, 'student');
     const body = studentInput(await bodyJson(request));
-    await env.DB.prepare('INSERT INTO checkins(round_id,user_id,email,room,seat,class_name,student_number) VALUES(?,?,?,?,?,?,?)').bind(body.roundId,user.user_id,user.email,body.room,body.seat,body.className,body.studentNumber).run();
+    await env.DB.prepare('INSERT INTO checkins(round_id,user_id,email,room,seat,class_name,student_number,student_name) VALUES(?,?,?,?,?,?,?,?)').bind(body.roundId,user.user_id,user.email,body.room,body.seat,body.className,body.studentNumber,body.studentName).run();
     return json({ success: true });
   }
   if (path.startsWith('/api/admin/')) {
@@ -145,6 +145,11 @@ export async function route(request, env, ctx) {
     if (path === '/api/admin/logout' && method === 'POST') {
       await env.DB.prepare('DELETE FROM sessions WHERE token_hash=?').bind(user.token_hash).run();
       return json({ success: true }, 200, { 'Set-Cookie': cookie(request, 'attendance_admin', '', 0) });
+    }
+    if (path === '/api/admin/checkin' && method === 'POST') {
+      const body = studentInput(await bodyJson(request));
+      await env.DB.prepare('INSERT INTO checkins(round_id,user_id,email,room,seat,class_name,student_number,student_name) VALUES(?,?,?,?,?,?,?,?)').bind(body.roundId,'admin:'+crypto.randomUUID(),'',body.room,body.seat,body.className,body.studentNumber,body.studentName).run();
+      return json({ success: true });
     }
     if (path === '/api/admin/seat' && method === 'POST') {
       const body = await bodyJson(request); seatInput(body);
