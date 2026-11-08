@@ -205,3 +205,12 @@ test('names are required and admin assignments enforce identity, seat and round 
  assert.equal((await call('/api/checkin',body,student)).status,200);
  assert.equal((await (await call('/api/me',undefined,student)).json()).checkin.student_name,'王小明');
 });
+
+test('Google login bypasses shared IP quota even when admin quota is exhausted',async()=>{
+ const {call,DB}=await setup();
+ for(let i=0;i<20;i++) await call('/api/admin/login',{username:'wrong',password:'wrong'});
+ assert.equal((await call('/api/admin/login',{username:'wrong',password:'wrong'})).status,429);
+ const before=DB.sqlite.prepare('SELECT sum(attempts) AS n FROM login_limits').get().n;
+ for(let i=0;i<25;i++) assert.equal((await call('/api/auth/google',{credential:'invalid'})).status,401);
+ assert.equal(DB.sqlite.prepare('SELECT sum(attempts) AS n FROM login_limits').get().n,before);
+});

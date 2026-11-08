@@ -85,7 +85,7 @@ export async function route(request, env, ctx) {
     return json({ nonce }, 200, { 'Set-Cookie': cookie(request, 'attendance_nonce', nonce, 600) });
   }
   if (path === '/api/auth/google' && method === 'POST') {
-    await limitLogin(request, env);
+    // School Wi-Fi shares one public IP; Google logins must not share an IP quota.
     if (!env.GOOGLE_CLIENT_ID) throw fail('Google 登入尚未完成設定。', 503);
     const body = await bodyJson(request);
     const nonce = body.nonce || cookieValue(request, 'attendance_nonce');
